@@ -4,7 +4,12 @@ Code for data analysis of our experiment on narrow bracketing in work choices, j
 
 The relevant files can be found in data/:
 
-- `full_raw_data.csv`: what it says on the tin, combines several sheets of the original Excel spreadsheets downloaded from the Lioness server into a single csv file. The only cleaning performed at this stage is to have dropped some columns in Excel that at download from Lioness were messed up (spread across multiple columns). This affected only the times participants took on the tasks they did. We replaced missing data by `NA` (not available) rather than leaving it blank. We combined data from different sessions into a single data file, adding the information (date-time) of the session. And finally we dropped information always collected by Lioness on MTurk, such as worker IDs, payment confirmation, and so on.
+- `full_raw_data.csv`: what it says on the tin, combines several sheets of the original Excel spreadsheets downloaded from the Lioness server into a single csv file. The only cleaning performed at this stage:
+    1. we dropped columns about time taken on extra tasks that at download from Lioness were spread across multiple columns and hard to clean combine (and are not used in our analysis)
+    2. we replaced missing data by `NA` (not available) rather than leaving it blank
+    3. we combined data from different sessions into a single data file
+    4. we added added session information (date-time)
+    5. we do not include information Lioness collects on MTurk experiments, such as worker IDs and payment confirmation
 - `experiment-results.Rmd`: an RMarkdown file interlacing code for data analysis and presentation with the text of our results section
 - `exp2latex.R`: creates the tex file `experiment-results.tex` from `experiment-results.Rmd`, as well as all the tables in the rest of the paper. This tex file gets included directly in the paper. Requires Rscript, as well as the `rmarkdown` library (and many more to run the actually analysis code).
 - `makefile`: runs the `exp2latex.R` script to generate the tex file
