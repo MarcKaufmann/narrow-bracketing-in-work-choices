@@ -1,6 +1,6 @@
 # Data Analysis for Narrow Bracketing in Effort Choices
 
-Code for data analysis of our experiment on narrow bracketing in work choices, joint work between [Francesco Fallucchi](https://sites.google.com/site/francescofallucchi/) and [Marc Kaufmann](https://trichotomy.xyz/).
+Code for data analysis of [our experiment on narrow bracketing in work choices](https://trichotomy.xyz/publication/narrow-bracketing-in-effort-choices/narrow-bracketing-in-effort-choices.pdf), joint work between [Francesco Fallucchi](https://sites.google.com/site/francescofallucchi/) and [Marc Kaufmann](https://trichotomy.xyz/).
 
 The relevant files can be found in data/:
 
