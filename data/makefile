@@ -4,9 +4,15 @@
 # @file
 # @version 0.1
 
-all: experiment-results.tex
+all: clean_data.csv summary_outputs means_and_tests
 
-experiment-results.tex: experiment-results.Rmd
-	Rscript exp2latex.R
+clean_data.csv: clean-data.R
+	Rscript clean-data.R
+
+summary_outputs: summary_statistics.R
+	Rscript summary_statistics.R
+
+means_and_tests: means_and_tests.R
+	Rscript means_and_tests.R
 
 # end
