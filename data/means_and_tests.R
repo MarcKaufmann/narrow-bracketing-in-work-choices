@@ -82,7 +82,7 @@ table_of_means_data <- function(means_df, caption, label, ntreatments = 4) {
     digits=2,
     label=label
   ) %>%
-    kable_styling(latex_options=c("striped", "hold_position"), font_size=12) %>%
+    kable_styling(latex_options=c("hold_position"), font_size=12) %>%
     pack_rows("Scenario 1", 1, ntreatments) %>%
     pack_rows("Scenario 2", ntreatments + 1, 2*ntreatments)
 }
@@ -222,7 +222,7 @@ tex_for_pvalue <- function(df, ptest, filename, caption, label, treatments) {
     align="lccc",
     label=label,
   ) %>%
-    kable_styling(font_size = 12, latex_options="striped") %>%
+    kable_styling(font_size = 12) %>%
     pack_rows("Scenario 1", 1, n - 1) %>%
     pack_rows("Scenario 2", n, 2*(n - 1)) %>%
     write(filename)
@@ -256,7 +256,7 @@ tex_for_pvalue_all_plus_gender <- function(df, ptest, filename, caption, label, 
     align="lcccccc",
     label=label,
   ) %>%
-    kable_styling(font_size = 12, latex_options="striped") %>%
+    kable_styling(font_size = 12) %>%
     pack_rows("Scenario 1", 1, n - 1) %>%
     pack_rows("Scenario 2", n, 2*(n - 1)) %>%
     add_header_above(c("Pooled" = 3, "Female" = 2, "Male" = 2)) %>%
@@ -342,7 +342,7 @@ kbl(
   align="lccc",
   label = "clustered_FE_table"
 ) %>%
-  kable_styling(font_size = 12, latex_options="striped") %>%
+  kable_styling(font_size = 12) %>%
   write("clustered_fixed_effects_table.tex")
 
 kbl(
@@ -354,7 +354,7 @@ kbl(
   align="lccc",
   label = "clustered_FE_table_before_after"
 ) %>%
-  kable_styling(font_size = 12, latex_options="striped") %>%
+  kable_styling(font_size = 12) %>%
   write("clustered_fixed_effects_table_before_after.tex")
 
 ## Comparing variations of BOTH with other treatments and itself, depending on
@@ -444,7 +444,7 @@ tex_for_narrow_v_narrow <- function(ptest, ptestlabel, caption, filename, label)
     align="lr",
     label=label
   ) %>%
-    kable_styling(font_size = 12, latex_options="striped") %>%
+    kable_styling(font_size = 12) %>%
     write(filename)
 }
 
@@ -588,29 +588,44 @@ ttests_by_gender <- main_df %>%
   ) %>%
   unnest(c(results, stderr, diff_with_low))
 
+# The highest average reservation wage for 15 more tasks is 2.99, which we round to 3.00
+# Hence an upper bound for the average cost per task is 3.00/15, which leads to a lower bound for the number of tasks that are equivalent to the money lost.
+
+avg_cost_per_task <- 2.99/15
+
+summary_time_per_task <- consistent_df %>%
+  select(time_encryption_main_task, totaltask) %>%
+  filter(totaltask > 14) %>%
+  mutate(individual_time_per_task = time_encryption_main_task/totaltask) %>%
+  summarise(
+    avg_time_per_task = mean(individual_time_per_task),
+    median_time_per_task = median(individual_time_per_task),
+    stderr = sd(individual_time_per_task)
+  )
+
 rbind(ttests_pooled_gender, ttests_by_gender) %>%
-  select(scenario, gender, estimate, stderr, diff_with_low) %>%
+  select(scenario, gender, estimate, stderr) %>%
   mutate(
-    estimate = estimate/2,
-    stderr   = stderr/2
+    `task cost`         = estimate/avg_cost_per_task,
+    `time cost (secs)`  = sprintf( (estimate/avg_cost_per_task)*summary_time_per_task$avg_time_per_task, fmt =  '%1.0f')
   ) %>%
   rename(
-    Scenario               = scenario,
-    Gender                 = gender,
-    `$\\Delta/2$`          = estimate,
-    `Std.Err.`             = stderr,
-    `$m_{BOTH} - m_{MONEY/LOW}$` = diff_with_low
+    Scenario                        = scenario,
+    Gender                          = gender,
+    `$\\Delta$`                     = estimate,
+    `Std.Err.`                      = stderr
+    #`$m_{BOTH} - m_{MONEY/LOW}$`    = diff_with_low
   ) %>%
   kbl(
     "latex",
     escape=FALSE,
     booktabs=T,
-    caption="Table reporting $\\Delta/2$, the cost of narrow bracketing expressed as half of the difference between in average reservation wage between treatments NONE and BOTH.",
-    align="llrrr",
+    caption="Table reporting the cost of bracketing, always in terms of differences between NONE and BOTH. $\\Delta$ is the difference in reservation wages between BOTH and NONE, and the monetary cost when choices in NONE, which represent total experiment outcomes, are optimal. If we drop this assumption, since total outcomes should combine choices from in- and outside the experiment, the more conservative estimate is $\\Delta/2$ (not included in the table). Since the highest reservation wage for 15 more tasks is 2.99 across all treatments and scenarios, an upper bound for the average cost per task is $2.99/15 \\approx 0.20$. The cost in task-equivalents is then given by $\\Delta / 0.20$, and the cost in time-equivalents (in seconds) by $(\\Delta / 0.20) / 46$, since the average time taken for a task is 46 seconds.",
+    align="llrrrr",
     digits=2,
     label="cost_of_bracketing"
   ) %>%
-    kable_styling(font_size = 12, latex_options="striped") %>%
+    kable_styling(font_size = 12) %>%
     # FIXME: For final version, don't put gender info in table as well, but for now leave to avoid mistakes in hard-coded names below
     pack_rows("Pooled", 1, 2) %>%
     pack_rows("Female", 3, 4) %>%
@@ -646,7 +661,7 @@ money_and_none_means <- consistent_df %>%
     digits=2,
     label="means_work_bracketing"
   ) %>%
-    kable_styling(font_size = 12, latex_options="striped") %>%
+    kable_styling(font_size = 12) %>%
     write("means_work_bracketing.tex")
 
 
@@ -692,7 +707,7 @@ rbind(money_none_table_pooled_gender, money_none_table_by_gender) %>%
     digits=2,
     label="cost_of_work_bracketing"
   ) %>%
-    kable_styling(font_size = 12, latex_options="striped") %>%
+    kable_styling(font_size = 12) %>%
     # FIXME: For final version, don't put gender info in table as well, but for now leave to avoid mistakes in hard-coded names below
     pack_rows("Pooled", 1, 2) %>%
     pack_rows("Female", 3, 4) %>%
