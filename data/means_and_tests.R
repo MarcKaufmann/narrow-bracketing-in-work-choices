@@ -91,6 +91,10 @@ main_treatments <- c("NONE", "BOTH", "MONEY/LOW")
 main_df <- consistent_df %>%
   filter(treatment %in% main_treatments)
 
+partial_treatments <- c("NONE", "BOTH", "MONEY")
+partial_df <- consistent_df %>%
+  filter(treatment %in% partial_treatments)
+
 main_df %>%
   means_data() %>%
   select(-scenario) %>%
@@ -297,6 +301,15 @@ tex_for_pvalue(
   filename="t_test_tables.tex",
   label="t_tables",
   treatments=main_treatments
+)
+
+tex_for_pvalue(
+  partial_df,
+  t_pvalue,
+  caption="Between-treatment p-values for treatments NONE, MONEY, and BOTH based on two-sided t-tests, treating each individual in each scenario as a single independent observation.",
+  filename="t_test_tables_partial.tex",
+  label="t_test_tables_partial",
+  treatments=partial_treatments
 )
 
 ## 'clustered t-tests' that is, OLS pooling the data between scenarios and
@@ -604,24 +617,24 @@ summary_time_per_task <- consistent_df %>%
   )
 
 rbind(ttests_pooled_gender, ttests_by_gender) %>%
-  select(scenario, gender, estimate, stderr) %>%
+  select(scenario, gender, estimate, stderr, diff_with_low) %>%
   mutate(
-    `task cost`         = estimate/avg_cost_per_task,
-    `time cost (secs)`  = sprintf( (estimate/avg_cost_per_task)*summary_time_per_task$avg_time_per_task, fmt =  '%1.0f')
+    `Task equivalent`            = estimate/avg_cost_per_task,
+    `Time equivalent (in secs)`  = sprintf( (estimate/avg_cost_per_task)*summary_time_per_task$avg_time_per_task, fmt =  '%1.0f')
   ) %>%
   rename(
     Scenario                        = scenario,
     Gender                          = gender,
     `$\\Delta$`                     = estimate,
-    `Std.Err.`                      = stderr
-    #`$m_{BOTH} - m_{MONEY/LOW}$`    = diff_with_low
+    `Std.Err.`                      = stderr,
+    `$\\hat{\\Delta}$`               = diff_with_low
   ) %>%
   kbl(
     "latex",
     escape=FALSE,
     booktabs=T,
-    caption="Table reporting the cost of bracketing, always in terms of differences between NONE and BOTH. $\\Delta$ is the difference in reservation wages between BOTH and NONE, and the monetary cost when choices in NONE, which represent total experiment outcomes, are optimal. If we drop this assumption, since total outcomes should combine choices from in- and outside the experiment, the more conservative estimate is $\\Delta/2$ (not included in the table). Since the highest reservation wage for 15 more tasks is 2.99 across all treatments and scenarios, an upper bound for the average cost per task is $2.99/15 \\approx 0.20$. The cost in task-equivalents is then given by $\\Delta / 0.20$, and the cost in time-equivalents (in seconds) by $(\\Delta / 0.20) / 46$, since the average time taken for a task is 46 seconds.",
-    align="llrrrr",
+    caption="The table reports $\\Delta$, the change in reservation wages between NONE and BOTH. The highest reservation wage for 15 more tasks is 2.99 across all treatments and scenarios, so that $2.99/15 \\approx 0.20$ is an upper bound for the average cost per task. Using this, we can convert $\\Delta$ into task-equivalents by $\\Delta / 0.20$, and the cost in time-equivalents (in seconds) by $(\\Delta / 0.20) / 46$, since the average time taken for a task is 46 seconds. \\emph{$\\hat{\\Delta}$} stands for $m_{NONE} - m_{MONEY/LOW}$: the change in the marginal disutility of doing 15 extra tasks on top of a low vs on top of a high baseline. Under full narrow bracketing, \\emph{$\\hat{\\Delta}$} and $\\Delta$ should be equal.",
+    align="llrrrrr",
     digits=2,
     label="cost_of_bracketing"
   ) %>%
@@ -664,45 +677,56 @@ money_and_none_means <- consistent_df %>%
     kable_styling(font_size = 12) %>%
     write("means_work_bracketing.tex")
 
+# Test whether people bracket work broadly
 
-money_none_table_pooled_gender <- consistent_df %>%
-  filter(treatment %in% c("MONEY", "BOTH")) %>%
+work_diff_low_partial <- function(df) {
+  mean(df$reservation_wage [ df$treatment == "MONEY" ], na.rm = TRUE) - mean(df$reservation_wage [ df$treatment == "MONEY/LOW" ], na.rm = TRUE)
+}
+
+money_both_table_pooled_gender <- consistent_df %>%
+  filter(treatment %in% c("MONEY", "BOTH", "MONEY/LOW")) %>%
   nest(-scenario) %>%
   mutate(
     diff = map(data, money_diff(c("MONEY", "BOTH"))),
     results = map(diff, glance),
-    stderr = map(diff, "stderr")
+    stderr = map(diff, "stderr"),
+    diff_with_low_partial = map(data, work_diff_low_partial)
   ) %>%
-  unnest(c(results, stderr)) %>%
+  unnest(c(results, stderr, diff_with_low_partial)) %>%
   mutate(gender = "Pooled") %>%
-  select(scenario, gender, estimate, stderr, p.value)
+  select(scenario, gender, estimate, stderr, diff_with_low_partial, p.value)
 
-money_none_table_by_gender <- consistent_df %>%
-  filter(treatment %in% c("MONEY", "BOTH")) %>%
+money_both_table_by_gender <- consistent_df %>%
+  filter(treatment %in% c("MONEY", "BOTH", "MONEY/LOW")) %>%
   # Only 3 observations with gender == "Other", which breaks tests, so drop
   filter(gender != "Other") %>%
   nest(-scenario, -gender) %>%
   mutate(
     diff = map(data, money_diff(c("MONEY", "BOTH"))),
     results = map(diff, glance),
-    stderr = map(diff, "stderr")
+    stderr = map(diff, "stderr"),
+    diff_with_low_partial = map(data, work_diff_low_partial)
   ) %>%
-  unnest(c(results, stderr)) %>%
-  select(scenario, gender, estimate, stderr, p.value)
+  unnest(c(results, stderr, diff_with_low_partial)) %>%
+  select(scenario, gender, estimate, stderr, diff_with_low_partial, p.value)
 
-rbind(money_none_table_pooled_gender, money_none_table_by_gender) %>%
+rbind(money_both_table_pooled_gender, money_both_table_by_gender) %>%
+  #mutate(
+  #  p.value = pvalue_to_char(p.value)
+  #) %>%
   select(-p.value) %>%
   rename(
     Scenario = scenario,
     Gender = gender,
-    `$\\Delta/2$` = estimate/2,
-    `Std. Err.` = stderr/2
+    `$\\Delta$` = estimate,
+    `Std. Err.` = stderr,
+    `$\\hat{\\Delta}$` = diff_with_low_partial
   ) %>%
   kbl(
     "latex",
     escape=FALSE,
     booktabs=T,
-    caption="Cost of narrowly bracketing work (but not money) only, using the conservative bound of $\\Delta/2$, where $\\Delta$ is the average difference in reservation wages between treatments MONEY and BOTH.",
+    caption="The table reports $\\Delta$, the change in reservation wages between MONEY and BOTH. Under broad bracketing of work, $\\Delta$ should be $0$. \\emph{$\\hat{\\Delta}$} stands for $m_{MONEY} - m_{MONEY/LOW}$. When $\\hat{\\Delta} = 0$, we cannot identify full narrow bracketing from broad bracketing of work.",
     align="llrrr",
     digits=2,
     label="cost_of_work_bracketing"
@@ -714,7 +738,69 @@ rbind(money_none_table_pooled_gender, money_none_table_by_gender) %>%
     pack_rows("Male", 5, 6) %>%
     write("table_cost_of_work_bracketing.tex")
 
-path_df_NONE_MONEY <- function(sc) {
+# Test whether people bracket money alone broadly
+
+money_diff_low_partial <- function(df) {
+  mean(df$reservation_wage [ df$treatment == "BOTH" ], na.rm = TRUE) - mean(df$reservation_wage [ df$treatment == "MONEY/LOW" ], na.rm = TRUE)
+}
+
+money_none_table_pooled_gender <- consistent_df %>%
+  filter(treatment %in% c("MONEY", "BOTH", "MONEY/LOW", "NONE")) %>%
+  nest(-scenario) %>%
+  mutate(
+    diff = map(data, money_diff(c("MONEY", "NONE"))),
+    results = map(diff, glance),
+    stderr = map(diff, "stderr"),
+    diff_with_low_partial = map(data, money_diff_low_partial)
+  ) %>%
+  unnest(c(results, stderr, diff_with_low_partial)) %>%
+  mutate(gender = "Pooled") %>%
+  select(scenario, gender, estimate, stderr, diff_with_low_partial, p.value)
+
+money_none_table_by_gender <- consistent_df %>%
+  filter(treatment %in% c("MONEY", "BOTH", "MONEY/LOW", "NONE")) %>%
+  # Only 3 observations with gender == "Other", which breaks tests, so drop
+  filter(gender != "Other") %>%
+  nest(-scenario, -gender) %>%
+  mutate(
+    diff = map(data, money_diff(c("MONEY", "NONE"))),
+    results = map(diff, glance),
+    stderr = map(diff, "stderr"),
+    diff_with_low_partial = map(data, money_diff_low_partial)
+  ) %>%
+  unnest(c(results, stderr, diff_with_low_partial)) %>%
+  select(scenario, gender, estimate, stderr, diff_with_low_partial, p.value)
+
+rbind(money_none_table_pooled_gender, money_none_table_by_gender) %>%
+  # mutate(
+  #   p.value = pvalue_to_char(p.value)
+  # ) %>%
+  select(-p.value) %>%
+  rename(
+    Scenario = scenario,
+    Gender = gender,
+    `$\\Delta$` = estimate,
+    `Std. Err.` = stderr,
+    `$\\hat{\\Delta}$` = diff_with_low_partial
+  ) %>%
+  kbl(
+    "latex",
+    escape=FALSE,
+    booktabs=T,
+    caption="The table reports $\\Delta$, the change in reservation wages between MONEY and NONE. Broad bracketing of money requires $\\Delta = 0$. \\emph{$\\hat{\\Delta}$} stands for $m_{BOTH} - m_{MONEY/LOW}$. Full narrow bracketing requires $\\hat{\\Delta} = 0$.",
+    align="llrrr",
+    digits=2,
+    label="cost_of_money_bracketing"
+  ) %>%
+    kable_styling(font_size = 12) %>%
+    # FIXME: For final version, don't put gender info in table as well, but for now leave to avoid mistakes in hard-coded names below
+    pack_rows("Pooled", 1, 2) %>%
+    pack_rows("Female", 3, 4) %>%
+    pack_rows("Male", 5, 6) %>%
+    write("table_cost_of_money_bracketing.tex")
+
+
+path_df_NONE_LOWMONEY <- function(sc) {
   offset <- ifelse(sc == "Scenario1", 0, -0.10)
   tibble(
     treatment = c("NONE", "NONE", "MONEY/LOW", "MONEY/LOW"),
@@ -732,7 +818,7 @@ path_df_NONE_BOTH <- function(sc) {
   )
 }
 
-path_df_BOTH_MONEY <- function(sc) {
+path_df_BOTH_LOWMONEY <- function(sc) {
   offset <- ifelse(sc == "Scenario1", 0.6, 0.25)
   tibble(
     treatment = c("BOTH", "BOTH", "MONEY/LOW", "MONEY/LOW"),
@@ -741,8 +827,27 @@ path_df_BOTH_MONEY <- function(sc) {
   )
 }
 
+path_df_BOTH_MONEY <- function(sc) {
+  offset <- ifelse(sc == "Scenario1", 0.45, 0.25)
+  tibble(
+    treatment = c("BOTH", "BOTH", "MONEY", "MONEY"),
+    res_wage = c(3.25, 3.35, 3.35, 3.25) - offset,
+    scenario = rep(sc, 4)
+  )
+}
+
+path_df_NONE_MONEY <- function(sc) {
+  offset <- ifelse(sc == "Scenario1", 0, -0.10)
+  tibble(
+    treatment = c("NONE", "NONE", "MONEY", "MONEY"),
+    res_wage = c(3.40, 3.50, 3.50, 3.40) - offset,
+    scenario = rep(sc, 4)
+  )
+}
+
+
 # FIXME: p-values are hardcoded below, that's not ideal
-ann_text <- tibble(
+ann_text_main <- tibble(
   treatment = c("NONE", "NONE", "BOTH", "NONE", "NONE", "BOTH"),
   res_wage = c(3.60, 3.35, 2.85, 3.70, 3.45, 3.20),
   lab = c("            < 0.001", "   < 0.001", "    0.106",
@@ -753,8 +858,22 @@ ann_text <- tibble(
   )
 )
 
-scenario1_label <- "Scenario 1: \n d(30) - d(15) in NONE \n d(15) - d(0) in MONEY/LOW"
-scenario2_label <- "Scenario 2: \n d(45) - d(30) in NONE \n d(30) - d(15) in MONEY/LOW"
+ann_text_partial <- tibble(
+  treatment = c("NONE", "NONE", "BOTH", "NONE", "NONE", "BOTH"),
+  res_wage = c(3.60, 3.35, 3.00, 3.70, 3.45, 3.20),
+  lab = c("            0.012", "     < 0.001", "     0.002",
+          "            < 0.001", "     0.040", "     0.067"),
+  scenario = factor(
+    c(rep("Scenario1", 3), rep("Scenario2", 3)),
+    c("Scenario1", "Scenario2")
+  )
+)
+
+scenario1_label <- "Reservation wages in Scenario 1"
+scenario2_label <- "Reservation wages in Scenario 2"
+
+scenario1_label_partial <- "Scenario 1: \n d(30) - d(15) in NONE and MONEY"
+scenario2_label_partial <- "Scenario 2: \n d(45) - d(30) in NONE and MONEY"
 
 pvalue_plot <- main_df %>%
   means_data() %>%
@@ -762,13 +881,33 @@ pvalue_plot <- main_df %>%
   geom_col(aes(fill = treatment)) +
   geom_errorbar(aes(ymin = res_wage - 2*standard_error, ymax = res_wage + 2*standard_error), width = 0.3) +
   facet_wrap(~scenario, labeller = as_labeller(c(Scenario1 = scenario1_label, Scenario2 = scenario2_label))) +
+  geom_path(aes(group = scenario), path_df_NONE_LOWMONEY("Scenario1")) +
+  geom_path(aes(group = scenario), path_df_NONE_LOWMONEY("Scenario2")) +
+  geom_path(aes(group = scenario), path_df_NONE_BOTH("Scenario1")) +
+  geom_path(aes(group = scenario), path_df_NONE_BOTH("Scenario2")) +
+  geom_path(aes(group = scenario), path_df_BOTH_LOWMONEY("Scenario1")) +
+  geom_path(aes(group = scenario), path_df_BOTH_LOWMONEY("Scenario2")) +
+  geom_text(data = ann_text_main, aes(label = lab), hjust=0) +
+  labs(x = "Treatment", y = "Reservation Wage ($)", fill = "Treatment")
+
+ggsave("bar_plot_means.png", pvalue_plot)
+
+# FIXME: path_df_BOTH_MONEY and path_df_NONE_MONEY are copy-pasted from money low, so need to be adjusted
+# FIXME: ann_text_partial has p-values from MONEY/LOW not MONEY, need to fix
+
+pvalue_plot_partial <- partial_df %>%
+  means_data() %>%
+  ggplot(mapping = aes(x = treatment, y = res_wage)) +
+  geom_col(aes(fill = treatment)) +
+  geom_errorbar(aes(ymin = res_wage - 2*standard_error, ymax = res_wage + 2*standard_error), width = 0.3) +
+  facet_wrap(~scenario, labeller = as_labeller(c(Scenario1 = scenario1_label_partial, Scenario2 = scenario2_label_partial))) +
   geom_path(aes(group = scenario), path_df_NONE_MONEY("Scenario1")) +
   geom_path(aes(group = scenario), path_df_NONE_MONEY("Scenario2")) +
   geom_path(aes(group = scenario), path_df_NONE_BOTH("Scenario1")) +
   geom_path(aes(group = scenario), path_df_NONE_BOTH("Scenario2")) +
   geom_path(aes(group = scenario), path_df_BOTH_MONEY("Scenario1")) +
   geom_path(aes(group = scenario), path_df_BOTH_MONEY("Scenario2")) +
-  geom_text(data = ann_text, aes(label = lab), hjust=0) +
+  geom_text(data = ann_text_partial, aes(label = lab), hjust=0) +
   labs(x = "Treatment", y = "Reservation Wage ($)", fill = "Treatment")
 
-ggsave("bar_plot_means.png", pvalue_plot)
+ggsave("bar_plot_means_partial.png", pvalue_plot_partial)

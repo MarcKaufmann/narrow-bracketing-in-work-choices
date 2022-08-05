@@ -82,8 +82,8 @@ summary_stats <- function(df) {
       share_female  = round(mean(gender == "Female", na.rm=TRUE), digits=2),
       age           = round(mean(age, na.rm=TRUE),digits =1),
       tediousness   = round(mean(tediousness, na.rm=TRUE), digits=2),
-      inconsistent1 = sum(inconsistent1, na.rm=TRUE),
-      inconsistent2 = sum(inconsistent2, na.rm=TRUE)
+      inconsistent1 = paste0(round(100*mean(inconsistent1, na.rm=TRUE), digits=1), "%"),
+      inconsistent2 = paste0(round(100*mean(inconsistent2, na.rm=TRUE), digits=1), "%")
     ) %>%
     mutate(treatment = as.character(treatment)) %>%
     ungroup()

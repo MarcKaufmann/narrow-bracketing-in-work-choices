@@ -37,10 +37,10 @@ df2 <- df1 %>%
 df3 <- df2 %>% rename(scenariochosen = scenario)
 # pid: unique participant ID
 # treatment: number indicating treatment of participant
-#   1: NARROW
-#   2: LOW
-#   3: BROAD
-#   4: PARTIAL
+#   1: BOTH
+#   2: MONEY/LOW
+#   3: NONE
+#   4: MONEY
 #   5: BEFORE
 #   6: AFTER
 # relevant: choice that matters, first 16 are scenario 1 next 16 are scenario 32
@@ -68,7 +68,7 @@ df3 <- df2 %>% rename(scenariochosen = scenario)
 # age: self-reported age in years
 # bonus: DROP, related to payment calculations, depends on treatment
 # total: total payment received, including participation bonus
-# (DROP all time_* variables) all time_* variables denote the time in seconds taken on that step
+# (DROP all time_* variables, except time_encryption_main_task, which we need to compute how long participants take to do the tasks) all time_* variables denote the time in seconds taken on that step
 # time_welcome:
 # time_instructions_pre:
 # time_encryption_task:
